@@ -265,7 +265,7 @@ char buffer[2048], buffer2[2048];
 char inifilename[24], xexinifilename[17], gamename[151];
 char sense[20], specialerror[200];
 char installdirvideofilepath[2048] = {0};
-unsigned char ubuffer[2048], ss[2048], fixed_ss[2048], cdb[12];
+unsigned char ubuffer[2048], ss[2048], fixed_ss[2048], cdb[12], zeros[2048];
 unsigned char bigbuffer[BIGBUF_SIZE];
 unsigned long filecount = 0L;
 unsigned long seek;
@@ -381,6 +381,10 @@ bool extractimages = false, embedimages = false, noxexiniavailable = false, offl
 bool verify_found_bad_pfi_or_video = false;
 bool game_has_ap25 = false;
 
+unsigned pfi_wave = 0;
+bool do_blank_ss = false;
+bool g_ssv2 = false; // set in checkss()
+
 // reset these global vars after every fileloop and parse cmd line again
 void resetvars() {
     writefile = true;
@@ -420,6 +424,8 @@ void resetvars() {
     extractimages = false; embedimages = false; noxexiniavailable = false; offlinewarningprinted = false;
     verify_found_bad_pfi_or_video = false;
     game_has_ap25 = false;
+    pfi_wave = 0;
+    do_blank_ss = false;
   return;
 }
 
@@ -2351,7 +2357,8 @@ void parsecmdline(int argc, char *argv[]) {
                 if (strcasecmp(argv[i], "--e-ss") == 0 && (i+1 < argc)) { extractssarg = i + 1; manualextract = true; }
                 if (strcasecmp(argv[i], "--patchgarbage") == 0) patchvalidfilesonly = false;
                 if (strcasecmp(argv[i], "--patchitanyway") == 0) patchifstealthpasses = true;
-                if (strcasecmp(argv[i], "--debug") == 0) { extraverbose = true; debug = true; }
+                if (strcasecmp(argv[i], "--blank-ss") == 0) { do_blank_ss = true; manualpatch = true; }
+		if (strcasecmp(argv[i], "--debug") == 0) { extraverbose = true; debug = true; }
                 if (strcasecmp(argv[i], "--debugfs") == 0) { extraverbose = true; debug = true; debugfs = true; }
                 if (strcasecmp(argv[i], "--rebuildlowspace") == 0) rebuildlowspace = true;
                 if (strcasecmp(argv[i], "--keeporiginaliso") == 0) keeporiginaliso = true;
@@ -2570,6 +2577,7 @@ void initializeglobals() {
     datfileap25mediaids = NULL;
     num_ap25mediaids = NUM_CURRENTAP25MEDIAIDS;
     
+    memset(zeros, 0, 2048);
   return;
 }
 
@@ -2699,8 +2707,9 @@ int main(int argc, char *argv[]) {
         printf("%s --e-pfi %sfile%s %s extract PFI to %sfile%s%s", sp6, lessthan, greaterthan, sp11, lessthan, greaterthan, newline);
         printf("%s --e-dmi %sfile%s %s extract DMI to %sfile%s%s", sp6, lessthan, greaterthan, sp11, lessthan, greaterthan, newline);
         printf("%s --e-ss %sfile%s %s extract SS to %sfile%s%s", sp6, lessthan, greaterthan, sp12, lessthan, greaterthan, newline);
-        printf("%s --clobber %s %s overwrite extracted files without prompting%s%s", sp6, sp10, sp5, newline, newline);
-        
+        printf("%s --clobber %s %s overwrite extracted files without prompting%s", sp6, sp10, sp5, newline);
+        printf("%s --blank-ss %s %s blanks SS (ignored if  SSv2; use --patchgarbage --patchitanyway --p-ss ... to force SSv2 blanking)%s", 		sp6, sp10, sp4, newline);
+	printf("%s", newline);
         color(white);
         printf("Misc:%s%s", newline, newline);
         color(normal);
@@ -4722,6 +4731,15 @@ void domanualpatch(char *argv[]) {
         endofpatchss2:
             if (patchdmiarg || patchpfiarg || patchvideoarg) printf("%s", newline);
     }
+    if (do_blank_ss && (!g_ssv2) && pfi_wave >= 2) {
+    	printf("Blanking v1 SS%s", newline);
+	if (trytowritestealthfile(zeros, 1, 2048, fp, isofilename, 0xFD8F800LL) != 0) goto endofpatchblankss;
+	color(green);
+	printf("Blanking SS was successful%s", newline);
+	color(normal);
+	endofpatchblankss:;
+    }
+
     if (patchdmiarg) {
         FILE *patchdmifile;
         printf("Patching DMI from %s%s%s%s", quotation, argv[patchdmiarg], quotation, newline);
@@ -14099,6 +14117,7 @@ int checkss() {
             break;
         }
     }
+    g_ssv2 = ssv2;
     // detect bad shit - struct badshit {unsigned char c[21], d[21], data[21]; int count; char* explanation;};
     struct badshit unmatcheddcrtentry, multiplematcheddcrtentry, CTRTmismatch, badCD, badResponse, weirdCDResponse,
                    unrecognizedCT, badcpr_mai, type0dataresponsemismatch,
@@ -15659,6 +15678,7 @@ void checkpfi(unsigned char *pfi) {
         if (pfi_crc32 == mostrecentpfientries[m].crc) {
             printf("PFI matches known data (%s)%s", mostrecentpfientries[m].description, newline);
             pfirecognized = true;
+	    pfi_wave = m;
             break;
         }
     }
