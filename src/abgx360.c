@@ -59,6 +59,7 @@ Copyright 2008-2010 by Seacrest <Seacrest[at]abgx360[dot]net>
 #include <time.h> // for time()
 #include <dirent.h> // for opendir, readdir
 #include <sys/stat.h> // for stat(), bsd/posix mkdir()
+#include <setjmp.h>
 #include "rijndael-alg-fst.h"
 #include "sha1.h"
 #include "mspack/mspack.h"
@@ -384,6 +385,9 @@ bool game_has_ap25 = false;
 unsigned pfi_wave = 0;
 bool do_blank_ss = false;
 bool g_ssv2 = false; // set in checkss()
+bool checked_stealth = false;
+
+static jmp_buf nextfile;
 
 // reset these global vars after every fileloop and parse cmd line again
 void resetvars() {
@@ -425,7 +429,7 @@ void resetvars() {
     verify_found_bad_pfi_or_video = false;
     game_has_ap25 = false;
     pfi_wave = 0;
-    do_blank_ss = false;
+    checked_stealth = false;
   return;
 }
 
@@ -4029,7 +4033,12 @@ int main(int argc, char *argv[]) {
             // check Video
             if (verbose) printf("%s", newline);
             checkvideo(isofilename, fp, false, checkpadding);
-            
+           
+	    checked_stealth = true;
+	    if (do_blank_ss && (!g_ssv2)) {
+	    	domanualpatch(argv);
+		ss_stealthfailed = 1;
+		}
             if (video_stealthfailed || pfi_stealthfailed || dmi_stealthfailed || ss_stealthfailed || stealthfailed) {
                 color(red);
                 printf("%sStealth check failed!%s", newline, newline);
@@ -4207,6 +4216,7 @@ int main(int argc, char *argv[]) {
                     checkgamecrcnever = true;
                     gamecrcfailed = true;
                 }
+		if (setjmp(nextfile)) { /* do nothing */ }
             }
         }
     }
@@ -4731,13 +4741,15 @@ void domanualpatch(char *argv[]) {
         endofpatchss2:
             if (patchdmiarg || patchpfiarg || patchvideoarg) printf("%s", newline);
     }
-    if (do_blank_ss && (!g_ssv2) && pfi_wave >= 2) {
+    if (checked_stealth && do_blank_ss && (!g_ssv2) && pfi_wave >= 2) {
     	printf("Blanking v1 SS%s", newline);
 	if (trytowritestealthfile(zeros, 1, 2048, fp, isofilename, 0xFD8F800LL) != 0) goto endofpatchblankss;
 	color(green);
 	printf("Blanking SS was successful%s", newline);
+	fflush(fp);
 	color(normal);
-	endofpatchblankss:;
+	endofpatchblankss:
+		longjmp(nextfile, 1);
     }
 
     if (patchdmiarg) {
