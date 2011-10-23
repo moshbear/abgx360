@@ -2357,7 +2357,7 @@ void parsecmdline(int argc, char *argv[]) {
                 if (strcasecmp(argv[i], "--e-ss") == 0 && (i+1 < argc)) { extractssarg = i + 1; manualextract = true; }
                 if (strcasecmp(argv[i], "--patchgarbage") == 0) patchvalidfilesonly = false;
                 if (strcasecmp(argv[i], "--patchitanyway") == 0) patchifstealthpasses = true;
-                if (strcasecmp(argv[i], "--blank-ss") == 0) { do_blank_ss = true; manualpatch = true; }
+                if (strcasecmp(argv[i], "--blank-ss") == 0) do_blank_ss = true;
 		if (strcasecmp(argv[i], "--debug") == 0) { extraverbose = true; debug = true; }
                 if (strcasecmp(argv[i], "--debugfs") == 0) { extraverbose = true; debug = true; debugfs = true; }
                 if (strcasecmp(argv[i], "--rebuildlowspace") == 0) rebuildlowspace = true;
@@ -3518,6 +3518,7 @@ int main(int argc, char *argv[]) {
     unsigned long fileloop;
     
     for (fileloop=0;fileloop<filecount;fileloop++) {
+    	reset_file:;
         if (filecount > 1) {
             if (fileloop) {
                 if (fp != NULL) fclose(fp);
@@ -3539,7 +3540,7 @@ int main(int argc, char *argv[]) {
               exit(1);
             }
             strcpy(isofilename, filenames[fileloop]);
-            fp = fopen(isofilename, "rb");
+            fp = fopen(isofilename, do_blank_ss ? "rb+" : "rb");
             if (fp == NULL) {
                 // couldn't open the file
                 color(red);
@@ -4026,11 +4027,11 @@ int main(int argc, char *argv[]) {
             donecheckread(isofilename);
             checkpfi(ubuffer);
             
-            // check Video
+	    // check Video
             if (verbose) printf("%s", newline);
             checkvideo(isofilename, fp, false, checkpadding);
             
-            if (video_stealthfailed || pfi_stealthfailed || dmi_stealthfailed || ss_stealthfailed || stealthfailed) {
+            if (video_stealthfailed || pfi_stealthfailed || dmi_stealthfailed || ss_stealthfailed || stealthfailed || (do_blank_ss && (!g_ssv2) && (pfi_wave >= 2))) {
                 color(red);
                 printf("%sStealth check failed!%s", newline, newline);
                 color(normal);
@@ -4208,7 +4209,7 @@ int main(int argc, char *argv[]) {
                     gamecrcfailed = true;
                 }
             }
-        }
+	}
     }
   return 0;
 }
@@ -4730,14 +4731,6 @@ void domanualpatch(char *argv[]) {
             fclose(patchssfile);
         endofpatchss2:
             if (patchdmiarg || patchpfiarg || patchvideoarg) printf("%s", newline);
-    }
-    if (do_blank_ss && (!g_ssv2) && pfi_wave >= 2) {
-    	printf("Blanking v1 SS%s", newline);
-	if (trytowritestealthfile(zeros, 1, 2048, fp, isofilename, 0xFD8F800LL) != 0) goto endofpatchblankss;
-	color(green);
-	printf("Blanking SS was successful%s", newline);
-	color(normal);
-	endofpatchblankss:;
     }
 
     if (patchdmiarg) {
@@ -7212,7 +7205,7 @@ int doautofix() {
     // autofix using the ini
     parseini();
     // get/open the required stealth files
-    if (ini_ss != ss_crc32 || drtfucked) {
+    if (do_blank_ss || ini_ss != ss_crc32 || drtfucked) {
         fixss = true;
         if (ini_ss == 0) {
             printf("ERROR: Failed to find an SS CRC in '%s'%s", inifilename, newline);
@@ -7577,7 +7570,7 @@ int doautofix() {
         if (verbose) printf("%sPatching DMI from %s%s", sp5, dmifilename, newline);
         if (trytowritestealthfile(autofix_dmi, 1, 2048, fp, isofilename, 0xFD8F000LL) != 0) return 1;
     }
-    if (fixss) {  // patch ss
+    if (do_blank_ss || fixss) {  // patch ss
         if (verbose) printf("%sPatching SS from %s%s", sp5, ssfilename, newline);
         if (trytowritestealthfile(ss, 1, 2048, fp, isofilename, 0xFD8F800LL) != 0) return 1;
     }
