@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.60)
-AC_INIT([abgx360], [1.0.5])
+AC_INIT([abgx360], [1.0.6])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 AC_CONFIG_SRCDIR([src/abgx360.c])
 AC_CONFIG_HEADER([config.h])
@@ -15,7 +15,7 @@ AC_PROG_GCC_TRADITIONAL
 AC_CHECK_LIB([z], [crc32], [], [AC_MSG_ERROR(["zlib not found!"])])
 LIBCURL_CHECK_CONFIG([yes], [7.7.2], [], [AC_MSG_ERROR(["libcurl not found!"])])
 CFLAGS="$CFLAGS $LIBCURL_CPPFLAGS"
-LIBS="$LIBCURL -lz"
+LIBS="$LIBCURL -lz -lm"
 # check for CAM if __FreeBSD__ is defined
 AC_EGREP_CPP(yes,
 [#ifdef __FreeBSD__
@@ -52,7 +52,7 @@ AC_FUNC_REALLOC
 AC_FUNC_STAT
 AC_FUNC_ERROR_AT_LINE
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([atexit gettimeofday memset strcasecmp strerror strncasecmp strtol strtoul strstr mkdir])
+AC_CHECK_FUNCS([atexit gettimeofday memset strcasecmp strerror strncasecmp strtol strtoul strstr mkdir pow])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
