@@ -1,12 +1,3 @@
-/******************************************************************************
-
-abgx360.c
-
-The ultimate tool for Xbox 360 ISOs and Stealth files!
-
-Copyright 2008-2012 by Seacrest <Seacrest[at]abgx360[dot]net>
-
-******************************************************************************/
 
 #if (defined(_WIN32) || defined(__WIN32__)) && !defined(WIN32)
     #define WIN32
@@ -451,6 +442,15 @@ long layerbreak = -1;
 
 bool do_blank_ss = false;
 bool g_ssv2 = false; // set in checkss()
+
+bool should_nuke_dmi() {
+	return xgd3
+		? false
+		: g_ssv2
+			? false
+			: do_blank_ss
+	;
+}
 
 // reset these global vars after every fileloop and parse cmd line again
 void resetvars() {
@@ -4348,7 +4348,7 @@ int main(int argc, char *argv[]) {
                 if (verbose) printf("%s", newline);
                 checkvideo(isofilename, fp, false, checkpadding);
                 
-                if (video_stealthfailed || pfi_stealthfailed || dmi_stealthfailed || ss_stealthfailed || stealthfailed || (do_blank_ss && (!g_ssv2) && (!xgd3))) {
+                if (video_stealthfailed || pfi_stealthfailed || dmi_stealthfailed || ss_stealthfailed || stealthfailed) {
                     color(red);
                     printf("%sStealth check failed!%s", newline, newline);
                     color(normal);
@@ -9696,7 +9696,7 @@ int doautofix() {
     // autofix using the ini
     parseini();
     // get/open the required stealth files
-    if (do_blank_ss || ini_ss != ss_crc32 || drtfucked) {
+    if (should_nuke_dmi() || ini_ss != ss_crc32 || drtfucked) {
         fixss = true;
         if (ini_ss == 0) {
             printf("ERROR: Failed to find an SS CRC in '%s'%s", inifilename, newline);
@@ -9759,9 +9759,11 @@ int doautofix() {
           return 1;
         }
     }
+    if (!should_nuke_dmi()) {
     for (i=0;i<ini_dmi_count;i++) {  // keep the current dmi if it matches any of the verified dmis for this xex/ss
         if (ini_dmi[i] == dmi_crc32) keepdmi = true;
     }
+  }
     if (!keepdmi) {
         if (ini_dmi_count == 0 || ini_dmi[0] == 0) {
             printf("ERROR: Failed to find a DMI CRC in '%s'%s", inifilename, newline);
@@ -18072,6 +18074,10 @@ int checkss() {
         printf("SS looks valid%s", newline);
         color(normal);
     }
+    if (should_nuke_dmi()) {
+            ss_stealthfailed = true;
+    	return 1;
+}
   return 0;
 }
 
