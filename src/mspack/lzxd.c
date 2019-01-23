@@ -86,12 +86,7 @@
  * to the bit buffer when the bit buffer already has 1 to 15 bits left.
  */
 
-#if HAVE_LIMITS_H
-# include <limits.h>
-#endif
-#ifndef CHAR_BIT
-# define CHAR_BIT (8)
-#endif
+#include <limits.h>
 #define BITBUF_WIDTH (sizeof(bit_buffer) * CHAR_BIT)
 
 #define STORE_BITS do {                                                 \
